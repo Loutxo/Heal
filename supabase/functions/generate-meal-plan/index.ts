@@ -10,6 +10,7 @@ import {
   tcmGuidanceForMonth,
 } from "../_shared/meal-plan-logic.ts";
 import { fetchSubscriptionAccess } from "../_shared/subscription-logic.ts";
+import { combineHouseholdRestrictions } from "../_shared/household-logic.ts";
 
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -85,6 +86,14 @@ Deno.serve(async (req) => {
     .eq("user_id", userId)
     .maybeSingle();
 
+  // Menu partagé pour tout le foyer (membres ajoutés depuis "Mon foyer") : leurs allergies,
+  // préférences et pathologies s'ajoutent à celles du titulaire — un menu commun doit rester
+  // sûr et compatible pour tout le monde, pas seulement pour le compte connecté.
+  const { data: householdMembers } = await supabase
+    .from("household_members")
+    .select("allergies, diet_preferences, pathologies")
+    .eq("user_id", userId);
+
   // Pas de filtre sur status ici : la contrainte UNIQUE(user_id, week_start) s'applique à toute ligne,
   // quel que soit son statut (y compris d'anciennes lignes "archived" d'un ancien mécanisme de régénération).
   // Il faut donc toujours repérer cette ligne pour la réutiliser (update en place), jamais tenter un insert à côté.
@@ -151,10 +160,18 @@ Deno.serve(async (req) => {
     return json({ error: { code: "CANDIDATES_ERROR", message: foodsError?.message ?? "Impossible de charger les aliments de saison." } }, 500);
   }
 
-  const allergies: string[] = restrictions?.allergies ?? [];
-  const dietPreferences: string[] = restrictions?.diet_preferences ?? [];
+  const combined = combineHouseholdRestrictions(
+    {
+      allergies: restrictions?.allergies ?? [],
+      diet_preferences: restrictions?.diet_preferences ?? [],
+      pathologies: healthData?.pathologies ?? [],
+    },
+    householdMembers ?? []
+  );
+  const allergies = combined.allergies;
+  const dietPreferences = combined.dietPreferences;
+  const pathologies = combined.pathologies;
   const dislikedNames = (restrictions?.disliked_foods ?? []).map((s: string) => s.toLowerCase());
-  const pathologies: string[] = healthData?.pathologies ?? [];
 
   const safeFoods = filterSafeFoods(foodsData, allergies, dietPreferences, dislikedNames);
 

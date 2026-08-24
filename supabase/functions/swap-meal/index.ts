@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { calculateCalorieTargets, filterSafeFoods, glycemicLevelFromLoad } from "../_shared/meal-plan-logic.ts";
 import { fetchSubscriptionAccess } from "../_shared/subscription-logic.ts";
+import { combineHouseholdRestrictions } from "../_shared/household-logic.ts";
 
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -65,6 +66,10 @@ Deno.serve(async (req) => {
     .select("allergies, diet_preferences, disliked_foods")
     .eq("user_id", userId)
     .maybeSingle();
+  const { data: householdMembers } = await supabase
+    .from("household_members")
+    .select("allergies, diet_preferences, pathologies")
+    .eq("user_id", userId);
 
   // Contexte de la semaine (hors repas à remplacer) pour éviter les doublons et permettre
   // aux déjeuners de semaine de continuer à référencer un dîner existant.
@@ -105,10 +110,18 @@ Deno.serve(async (req) => {
     return json({ error: { code: "CANDIDATES_ERROR", message: foodsError?.message ?? "Impossible de charger les aliments de saison." } }, 500);
   }
 
-  const allergies: string[] = restrictions?.allergies ?? [];
-  const dietPreferences: string[] = restrictions?.diet_preferences ?? [];
+  const combined = combineHouseholdRestrictions(
+    {
+      allergies: restrictions?.allergies ?? [],
+      diet_preferences: restrictions?.diet_preferences ?? [],
+      pathologies: healthData?.pathologies ?? [],
+    },
+    householdMembers ?? []
+  );
+  const allergies = combined.allergies;
+  const dietPreferences = combined.dietPreferences;
+  const pathologies = combined.pathologies;
   const dislikedNames = (restrictions?.disliked_foods ?? []).map((s: string) => s.toLowerCase());
-  const pathologies: string[] = healthData?.pathologies ?? [];
 
   const safeFoods = filterSafeFoods(foodsData, allergies, dietPreferences, dislikedNames);
 

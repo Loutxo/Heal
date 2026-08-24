@@ -261,6 +261,10 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
+        <Pressable style={styles.householdLink} onPress={() => router.push('/household')}>
+          <Text style={styles.householdLinkText}>👨‍👩‍👧 Gérer les membres du foyer (allergies, préférences)</Text>
+        </Pressable>
+
         <Text style={styles.sectionTitle}>Basculement du planning</Text>
         <Text style={styles.label}>
           Quand la page « Votre semaine » doit-elle passer au planning de la semaine suivante (une fois généré) ?
@@ -359,6 +363,8 @@ const styles = StyleSheet.create({
   stepperButton: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   stepperButtonText: { color: colors.white, fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 18 },
   stepperValue: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.text, minWidth: 20, textAlign: 'center' },
+  householdLink: { marginTop: 12, backgroundColor: colors.backgroundSecondary, borderRadius: radii.pill, paddingVertical: 12, paddingHorizontal: 16, alignSelf: 'flex-start' },
+  householdLinkText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.text },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

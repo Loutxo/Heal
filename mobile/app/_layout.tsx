@@ -100,6 +100,7 @@ function RootNavigator() {
       <Stack.Screen name="paywall" options={{ headerShown: false }} />
       <Stack.Screen name="manage-subscription" options={{ title: 'Mon abonnement' }} />
       <Stack.Screen name="legal" options={{ title: 'Conditions & mentions' }} />
+      <Stack.Screen name="household" options={{ title: 'Mon foyer' }} />
     </Stack>
   );
 }
