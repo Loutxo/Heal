@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Heal",
+    "slug": "heal",
+    "scheme": "heal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F5EDD8",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F5EDD8"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.heal.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#F5EDD8"
+      },
+      "package": "app.heal.mobile"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ]
+  }
+}

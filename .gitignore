@@ -1,0 +1,33 @@
+# Secrets — jamais versionnés
+.mcp.json
+.env
+.env.*
+!.env.example
+*.pem
+
+# Dépendances
+node_modules/
+**/node_modules/
+
+# Expo / React Native
+.expo/
+**/.expo/
+.expo-start.log
+**/.expo-start.log
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Supabase local dev
+supabase/.temp/
+supabase/.branches/
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
