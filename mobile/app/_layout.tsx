@@ -76,6 +76,9 @@ function RootNavigator() {
       <Stack.Screen name="settings" options={{ title: 'Mon profil' }} />
       <Stack.Screen name="seasonal-foods" options={{ title: 'Calendrier de saison' }} />
       <Stack.Screen name="available-produce" options={{ title: 'Ce que vous avez déjà' }} />
+      <Stack.Screen name="badges" options={{ title: 'Mes badges' }} />
+      <Stack.Screen name="points-history" options={{ title: 'Historique des points' }} />
+      <Stack.Screen name="validate-manual" options={{ title: 'Valider un repas' }} />
     </Stack>
   );
 }
