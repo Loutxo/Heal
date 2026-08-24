@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
+import { parseFunctionError } from '@/lib/functionError';
 
 const CATEGORY_ICONS: Record<string, string> = {
   passive_cooking: '⏱️',
@@ -77,7 +78,8 @@ export default function BatchCookingScreen() {
       });
       setGenerating(false);
       if (fnError || data?.error) {
-        setError(data?.error?.message ?? fnError?.message ?? 'Erreur lors de la génération du guide.');
+        const parsed = fnError ? await parseFunctionError(fnError) : data?.error;
+        setError(parsed?.message ?? 'Erreur lors de la génération du guide.');
         setLoading(false);
         return;
       }

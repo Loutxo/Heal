@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { matchDetectedFoodsToCatalog, type CatalogFood } from "../_shared/food-photo-logic.ts";
+import { fetchSubscriptionAccess } from "../_shared/subscription-logic.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +39,10 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return json({ error: { code: "UNAUTHENTICATED", message: "Session invalide" } }, 401);
   const userId = userData.user.id;
+
+  if (!(await fetchSubscriptionAccess(supabase, userId))) {
+    return json({ error: { code: "SUBSCRIPTION_REQUIRED", message: "Un abonnement actif est requis pour cette action." } }, 402);
+  }
 
   let body: { photo_path?: string; context?: "meal" | "fridge"; mime_type?: string } = {};
   try {

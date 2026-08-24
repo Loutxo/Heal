@@ -5,6 +5,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { BasileFeedback, BasileFeedbackData } from '@/components/BasileFeedback';
+import { parseFunctionError } from '@/lib/functionError';
 
 type Food = { id: number; name: string };
 
@@ -65,7 +66,8 @@ export default function ValidateManualScreen() {
     });
     setSubmitting(false);
     if (validateErr || data?.error) {
-      setError(data?.error?.message ?? validateErr?.message ?? 'Erreur lors de la validation.');
+      const parsed = validateErr ? await parseFunctionError(validateErr) : data?.error;
+      setError(parsed?.message ?? 'Erreur lors de la validation.');
       return;
     }
     setFeedback(data);

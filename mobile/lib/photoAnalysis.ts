@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/lib/supabase';
+import { parseFunctionError } from '@/lib/functionError';
 
 export type MatchedFood = { food_id: number; name: string; confidence: 'high' | 'medium' };
 
@@ -47,7 +48,8 @@ export async function pickAndAnalyzePhoto(
     body: { photo_path: photoPath, context, mime_type: mimeType },
   });
   if (analyzeError || data?.error) {
-    throw new Error(data?.error?.message ?? analyzeError?.message ?? "Échec de l'analyse de la photo.");
+    const parsed = analyzeError ? await parseFunctionError(analyzeError) : data?.error;
+    throw new Error(parsed?.message ?? "Échec de l'analyse de la photo.");
   }
 
   return { ...(data as Omit<PhotoAnalysisResult, 'local_uri'>), local_uri: asset.uri };

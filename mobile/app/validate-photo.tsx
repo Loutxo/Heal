@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { pickAndAnalyzePhoto, type MatchedFood } from '@/lib/photoAnalysis';
 import { BasileFeedback, BasileFeedbackData } from '@/components/BasileFeedback';
+import { parseFunctionError } from '@/lib/functionError';
 
 export default function ValidatePhotoScreen() {
   const { meal_id } = useLocalSearchParams<{ meal_id: string }>();
@@ -92,7 +93,8 @@ export default function ValidatePhotoScreen() {
     });
     setSubmitting(false);
     if (validateErr || data?.error) {
-      setError(data?.error?.message ?? validateErr?.message ?? 'Erreur lors de la validation.');
+      const parsed = validateErr ? await parseFunctionError(validateErr) : data?.error;
+      setError(parsed?.message ?? 'Erreur lors de la validation.');
       return;
     }
     setFeedback(data);

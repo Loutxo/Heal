@@ -13,15 +13,19 @@ const PUBLIC_ROUTES = ['login', 'signup', 'index'];
 // reset-password en particulier crée une session via le lien de récupération avant que
 // l'utilisateur ait pu saisir son nouveau mot de passe, une redirection y serait un vrai bug.
 const ALWAYS_ACCESSIBLE_ROUTES = ['forgot-password', 'reset-password'];
+// Accessibles même sans abonnement actif (US-090 : le profil et l'historique restent consultables
+// après expiration de l'essai) — settings pour la zone dangereuse/suppression de compte, RGPD oblige.
+const SUBSCRIPTION_EXEMPT_ROUTES = ['paywall', 'manage-subscription', 'settings', 'legal'];
 
 function RootNavigator() {
-  const { session, initializing, onboardingCompleted } = useAuth();
+  const { session, initializing, onboardingCompleted, subscription } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
     if (initializing) return;
     if (session && onboardingCompleted === null) return; // profil pas encore vérifié
+    if (session && onboardingCompleted && subscription === null) return; // abonnement pas encore vérifié
 
     const currentRoute = segments[0] ?? 'index';
     const onPublicRoute = PUBLIC_ROUTES.includes(currentRoute);
@@ -38,10 +42,21 @@ function RootNavigator() {
     }
     if (session && onboardingCompleted && onPublicRoute) {
       router.replace('/home');
+      return;
     }
-  }, [session, initializing, onboardingCompleted, segments, router]);
+    if (
+      session &&
+      onboardingCompleted &&
+      subscription &&
+      !subscription.hasAccess &&
+      !SUBSCRIPTION_EXEMPT_ROUTES.includes(currentRoute) &&
+      currentRoute !== 'onboarding'
+    ) {
+      router.replace('/paywall');
+    }
+  }, [session, initializing, onboardingCompleted, subscription, segments, router]);
 
-  if (initializing || (session && onboardingCompleted === null)) {
+  if (initializing || (session && onboardingCompleted === null) || (session && onboardingCompleted && subscription === null)) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.primary} />
@@ -82,6 +97,9 @@ function RootNavigator() {
       <Stack.Screen name="validate-photo" options={{ title: 'Valider par photo' }} />
       <Stack.Screen name="weekly-report" options={{ title: 'Rapport hebdomadaire' }} />
       <Stack.Screen name="report-history" options={{ title: 'Historique des rapports' }} />
+      <Stack.Screen name="paywall" options={{ headerShown: false }} />
+      <Stack.Screen name="manage-subscription" options={{ title: 'Mon abonnement' }} />
+      <Stack.Screen name="legal" options={{ title: 'Conditions & mentions' }} />
     </Stack>
   );
 }

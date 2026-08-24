@@ -8,11 +8,18 @@ import { supabase } from '@/lib/supabase';
 import { registerForPushNotifications } from '@/lib/pushNotifications';
 
 export default function HomeScreen() {
-  const { session, signOut } = useAuth();
+  const { session, signOut, subscription } = useAuth();
   const router = useRouter();
   const firstName = (session?.user.user_metadata as { first_name?: string } | undefined)?.first_name;
   const [totalPoints, setTotalPoints] = useState<number | null>(null);
   const [currentStreak, setCurrentStreak] = useState<number>(0);
+
+  // US-090 : indicateur de jours d'essai restants, visible à partir de J-7.
+  const trialDaysLeft =
+    subscription?.status === 'trial'
+      ? Math.ceil((new Date(subscription.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : null;
+  const showTrialCountdown = trialDaysLeft !== null && trialDaysLeft <= 7 && trialDaysLeft >= 0;
 
   useEffect(() => {
     loadStats();
@@ -34,6 +41,16 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>{firstName ? `Bonjour ${firstName} 👋` : 'Bonjour 👋'}</Text>
         <Text style={styles.subtitle}>Votre profil est complet. Générons votre planning de la semaine.</Text>
+
+        {showTrialCountdown ? (
+          <Pressable style={styles.trialBanner} onPress={() => router.push('/manage-subscription')}>
+            <Text style={styles.trialBannerText}>
+              {trialDaysLeft === 0
+                ? "Dernier jour d'essai — abonnez-vous pour ne pas perdre l'accès"
+                : `${trialDaysLeft} jour${trialDaysLeft! > 1 ? 's' : ''} d'essai restant${trialDaysLeft! > 1 ? 's' : ''}`}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {totalPoints !== null ? (
           <Pressable style={styles.statsRow} onPress={() => router.push('/points-history')}>
@@ -82,6 +99,10 @@ export default function HomeScreen() {
           <Text style={styles.secondaryButtonText}>📊 Rapport hebdomadaire</Text>
         </Pressable>
 
+        <Pressable style={styles.secondaryButton} onPress={() => router.push('/manage-subscription')}>
+          <Text style={styles.secondaryButtonText}>💳 Mon abonnement</Text>
+        </Pressable>
+
         <Pressable style={styles.secondaryButton} onPress={() => router.push('/settings')}>
           <Text style={styles.secondaryButtonText}>⚙️ Mon profil</Text>
         </Pressable>
@@ -125,6 +146,14 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
   },
+  trialBanner: {
+    backgroundColor: colors.primary,
+    borderRadius: radii.card,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  trialBannerText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.white, textAlign: 'center' },
   statItem: { flex: 1, alignItems: 'center' },
   statValue: { fontFamily: fonts.heading, fontSize: 20, color: colors.text },
   statLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted, marginTop: 2 },

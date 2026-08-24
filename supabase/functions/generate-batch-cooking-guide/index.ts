@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { fetchSubscriptionAccess } from "../_shared/subscription-logic.ts";
 
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -30,6 +31,10 @@ Deno.serve(async (req) => {
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return json({ error: { code: "UNAUTHENTICATED", message: "Session invalide" } }, 401);
   const userId = userData.user.id;
+
+  if (!(await fetchSubscriptionAccess(supabase, userId))) {
+    return json({ error: { code: "SUBSCRIPTION_REQUIRED", message: "Un abonnement actif est requis pour cette action." } }, 402);
+  }
 
   let body: { meal_plan_id?: string } = {};
   try {

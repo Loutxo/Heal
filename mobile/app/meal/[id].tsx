@@ -5,6 +5,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { BasileFeedback, BasileFeedbackData } from '@/components/BasileFeedback';
+import { parseFunctionError } from '@/lib/functionError';
 
 const MEAL_TYPE_LABELS: Record<string, string> = {
   breakfast: 'Petit-déjeuner',
@@ -71,7 +72,8 @@ export default function MealDetailScreen() {
     setSwapError(null);
     const { data, error: swapErr } = await supabase.functions.invoke('swap-meal', { body: { meal_id: id } });
     if (swapErr || data?.error) {
-      setSwapError(data?.error?.message ?? swapErr?.message ?? 'Erreur lors du remplacement.');
+      const parsed = swapErr ? await parseFunctionError(swapErr) : data?.error;
+      setSwapError(parsed?.message ?? 'Erreur lors du remplacement.');
       setSwapping(false);
       return;
     }
@@ -88,7 +90,8 @@ export default function MealDetailScreen() {
     });
     setValidating(false);
     if (validateErr || data?.error) {
-      setValidationError(data?.error?.message ?? validateErr?.message ?? 'Erreur lors de la validation.');
+      const parsed = validateErr ? await parseFunctionError(validateErr) : data?.error;
+      setValidationError(parsed?.message ?? 'Erreur lors de la validation.');
       return;
     }
     setIsValidated(true);

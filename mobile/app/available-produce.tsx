@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { Chip } from '@/components/onboarding/Chip';
 import { useAuth } from '@/context/AuthContext';
 import { pickAndAnalyzePhoto } from '@/lib/photoAnalysis';
+import { parseFunctionError } from '@/lib/functionError';
 
 type Food = { id: number; name: string; category_id: number };
 
@@ -76,12 +77,12 @@ export default function AvailableProduceScreen() {
     setGenerating(false);
 
     if (fnError || data?.error) {
-      const code = data?.error?.code;
-      if (code === 'PLAN_ALREADY_EXISTS') {
+      const parsed = fnError ? await parseFunctionError(fnError) : data?.error;
+      if (parsed?.code === 'PLAN_ALREADY_EXISTS') {
         router.push('/planning');
         return;
       }
-      setError(data?.error?.message ?? fnError?.message ?? 'Erreur inconnue lors de la génération.');
+      setError(parsed?.message ?? 'Erreur inconnue lors de la génération.');
       return;
     }
     router.push('/planning');
