@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { glycemicLevelFromLoad } from "../_shared/meal-plan-logic.ts";
 import { averageGlycemicLoad, basileAdviceForReport, foodDiversityScore, mostRecentSaturday, pickTopMeals } from "../_shared/weekly-report-logic.ts";
+import { buildPushMessages, sendExpoPushBatch } from "../_shared/push-logic.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -93,6 +94,18 @@ Deno.serve(async (req) => {
       continue;
     }
     created++;
+
+    const { data: profile } = await admin.from("user_profiles").select("notif_weekly_report").eq("id", plan.user_id).maybeSingle();
+    if (profile?.notif_weekly_report) {
+      const { data: tokens } = await admin.from("push_tokens").select("expo_push_token").eq("user_id", plan.user_id);
+      const messages = buildPushMessages(
+        (tokens ?? []).map((t: any) => t.expo_push_token),
+        "🦡 Votre rapport de la semaine est prêt",
+        basileAdvice,
+        { screen: "weekly-report" }
+      );
+      if (messages.length > 0) await sendExpoPushBatch(messages);
+    }
   }
 
   return json({ week_start: weekStart, created, skipped }, 200);

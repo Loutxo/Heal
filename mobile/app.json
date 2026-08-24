@@ -38,6 +38,13 @@
           "photosPermission": "Heal utilise vos photos pour reconnaître les aliments d'un repas ou de votre frigo.",
           "cameraPermission": "Heal utilise l'appareil photo pour reconnaître les aliments d'un repas ou de votre frigo."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#C4694F"
+        }
       ]
     ]
   }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, ActivityIndicator, Pressable, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
@@ -40,6 +40,10 @@ export default function SettingsScreen() {
   const [regionId, setRegionId] = useState<number | null>(null);
   const [householdSize, setHouseholdSize] = useState(1);
   const [rolloverDay, setRolloverDay] = useState<'thursday' | 'friday'>('friday');
+  const [notifDinner, setNotifDinner] = useState(true);
+  const [notifShopping, setNotifShopping] = useState(true);
+  const [notifBatchCooking, setNotifBatchCooking] = useState(true);
+  const [notifWeeklyReport, setNotifWeeklyReport] = useState(true);
 
   const [pathologies, setPathologies] = useState<string[]>([]);
   const [allergies, setAllergies] = useState<string[]>([]);
@@ -76,6 +80,10 @@ export default function SettingsScreen() {
       setRegionId(profile.region_id ?? null);
       setHouseholdSize(profile.household_size ?? 1);
       setRolloverDay((profile.week_rollover_day as 'thursday' | 'friday') ?? 'friday');
+      setNotifDinner(profile.notif_dinner_reminder ?? true);
+      setNotifShopping(profile.notif_shopping_reminder ?? true);
+      setNotifBatchCooking(profile.notif_batch_cooking_reminder ?? true);
+      setNotifWeeklyReport(profile.notif_weekly_report ?? true);
     }
     setPathologies(health?.pathologies ?? []);
     setAllergies(restrictions?.allergies ?? []);
@@ -119,6 +127,10 @@ export default function SettingsScreen() {
         activity_level: activityLevel,
         household_size: householdSize,
         week_rollover_day: rolloverDay,
+        notif_dinner_reminder: notifDinner,
+        notif_shopping_reminder: notifShopping,
+        notif_batch_cooking_reminder: notifBatchCooking,
+        notif_weekly_report: notifWeeklyReport,
       })
       .eq('id', session.user.id);
 
@@ -264,6 +276,24 @@ export default function SettingsScreen() {
           ))}
         </View>
 
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>Rappel du dîner (19h)</Text>
+          <Switch value={notifDinner} onValueChange={setNotifDinner} trackColor={{ true: colors.primary }} />
+        </View>
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>Rappel de courses (vendredi 18h)</Text>
+          <Switch value={notifShopping} onValueChange={setNotifShopping} trackColor={{ true: colors.primary }} />
+        </View>
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>Rappel batch cooking (dimanche 10h)</Text>
+          <Switch value={notifBatchCooking} onValueChange={setNotifBatchCooking} trackColor={{ true: colors.primary }} />
+        </View>
+        <View style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>Rapport hebdomadaire prêt</Text>
+          <Switch value={notifWeeklyReport} onValueChange={setNotifWeeklyReport} trackColor={{ true: colors.primary }} />
+        </View>
+
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {saved ? <Text style={styles.savedText}>✓ Enregistré</Text> : null}
 
@@ -329,6 +359,17 @@ const styles = StyleSheet.create({
   stepperButton: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   stepperButtonText: { color: colors.white, fontFamily: fonts.bodyMedium, fontSize: 16, lineHeight: 18 },
   stepperValue: { fontFamily: fonts.bodyMedium, fontSize: 16, color: colors.text, minWidth: 20, textAlign: 'center' },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: radii.card,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  toggleLabel: { fontFamily: fonts.body, fontSize: 14, color: colors.text, flex: 1, marginRight: 12 },
   errorText: { fontFamily: fonts.body, fontSize: 13, color: colors.primary, marginTop: 20 },
   savedText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.secondary, marginTop: 20 },
   saveButton: { backgroundColor: colors.primary, borderRadius: radii.pill, paddingVertical: 16, alignItems: 'center', marginTop: 20 },

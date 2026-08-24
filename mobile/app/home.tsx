@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { registerForPushNotifications } from '@/lib/pushNotifications';
 
 export default function HomeScreen() {
   const { session, signOut } = useAuth();
@@ -15,6 +16,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadStats();
+    if (session) registerForPushNotifications(session.user.id);
   }, []);
 
   async function loadStats() {
