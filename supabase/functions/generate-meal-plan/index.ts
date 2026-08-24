@@ -1,5 +1,14 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  addDays,
+  calculateCalorieTargets,
+  checkGenerationTiming,
+  filterSafeFoods,
+  glycemicLevelFromLoad,
+  nextSaturday,
+  tcmGuidanceForMonth,
+} from "../_shared/meal-plan-logic.ts";
 
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.6-flash";
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -34,7 +43,7 @@ Deno.serve(async (req) => {
   if (userError || !userData.user) return json({ error: { code: "UNAUTHENTICATED", message: "Session invalide" } }, 401);
   const userId = userData.user.id;
 
-  let body: { week_start?: string; force_regenerate?: boolean } = {};
+  let body: { week_start?: string; force_regenerate?: boolean; available_foods?: number[] } = {};
   try {
     body = await req.json();
   } catch {
@@ -42,6 +51,10 @@ Deno.serve(async (req) => {
   }
   const weekStart = body.week_start ?? nextSaturday();
   const forceRegenerate = body.force_regenerate ?? false;
+  // Légumes/fruits que l'utilisateur a déjà (saisie ponctuelle avant génération) — on les inclut
+  // dans les candidats même hors saisonnalité (l'utilisateur les a déjà, peu importe pourquoi),
+  // et on demande explicitement au modèle de les prioriser pour éviter le gaspillage.
+  const availableFoodIds = Array.isArray(body.available_foods) ? body.available_foods.filter((n) => Number.isInteger(n)) : [];
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
@@ -93,21 +106,19 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    if (latestPlan && weekStart > latestPlan.week_start) {
-      const earliestGenerationDate = addDays(weekStart, -2);
-      const todayISO = new Date().toISOString().slice(0, 10);
-      if (todayISO < earliestGenerationDate) {
-        return json(
-          {
-            error: {
-              code: "TOO_EARLY_TO_GENERATE",
-              message: `Le planning de la semaine du ${weekStart} ne peut être généré qu'à partir du ${earliestGenerationDate} (jeudi précédent).`,
-              earliest_generation_date: earliestGenerationDate,
-            },
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const timing = checkGenerationTiming(weekStart, latestPlan?.week_start ?? null, todayISO);
+    if (!timing.allowed) {
+      return json(
+        {
+          error: {
+            code: "TOO_EARLY_TO_GENERATE",
+            message: `Le planning de la semaine du ${weekStart} ne peut être généré qu'à partir du ${timing.earliestGenerationDate} (jeudi précédent).`,
+            earliest_generation_date: timing.earliestGenerationDate,
           },
-          422
-        );
-      }
+        },
+        422
+      );
     }
   }
 
@@ -123,11 +134,12 @@ Deno.serve(async (req) => {
     return json({ error: { code: "SEASONALITY_ERROR", message: seasonalError.message } }, 500);
   }
   const seasonalIds = (seasonalRows ?? []).map((r) => r.food_id);
+  const candidateIds = [...new Set([...seasonalIds, ...availableFoodIds])];
 
   const { data: foodsData, error: foodsError } = await supabase
     .from("foods")
-    .select("id, name, category_id, glycemic_index, allergen_tags, diet_compatibility, unit_concrete_label, tcm_nature, food_nutrients(carbs_g, energy_kcal, proteins_g)")
-    .in("id", seasonalIds)
+    .select("id, name, category_id, glycemic_index, allergen_tags, diet_compatibility, unit_concrete_label, tcm_nature, tcm_flavor, food_nutrients(carbs_g, energy_kcal, proteins_g)")
+    .in("id", candidateIds)
     .eq("is_active", true);
 
   if (foodsError || !foodsData) {
@@ -139,10 +151,7 @@ Deno.serve(async (req) => {
   const dislikedNames = (restrictions?.disliked_foods ?? []).map((s: string) => s.toLowerCase());
   const pathologies: string[] = healthData?.pathologies ?? [];
 
-  const safeFoods = foodsData
-    .filter((f) => !(f.allergen_tags ?? []).some((tag: string) => allergies.includes(tag)))
-    .filter((f) => dietPreferences.every((pref) => (f.diet_compatibility ?? []).includes(pref)))
-    .filter((f) => !dislikedNames.includes(f.name.toLowerCase()));
+  const safeFoods = filterSafeFoods(foodsData, allergies, dietPreferences, dislikedNames);
 
   if (safeFoods.length < 15) {
     return json(
@@ -161,10 +170,17 @@ Deno.serve(async (req) => {
 
   const calorieTargets = calculateCalorieTargets(profile);
 
+  const tcmSeasonGuidance = tcmGuidanceForMonth(month);
+
+  const availableFoodIdSet = new Set(availableFoodIds);
+  const availableFoodNames = safeFoods.filter((f) => availableFoodIdSet.has(f.id)).map((f) => f.name);
+
   const foodsList = safeFoods
     .map((f) => {
       const n = nutrientsOf(f.food_nutrients);
-      return `- id:${f.id} | ${f.name} | IG:${f.glycemic_index ?? "n/a"} | ${Math.round(n.energy_kcal)}kcal/${Math.round(n.proteins_g)}g prot. pour 100g | ${f.unit_concrete_label ?? ""} | nature MTC:${f.tcm_nature ?? "n/a"}`;
+      const flavors = (f.tcm_flavor ?? []).join("/") || "n/a";
+      const ownedTag = availableFoodIdSet.has(f.id) ? " | DÉJÀ EN STOCK CHEZ L'UTILISATEUR" : "";
+      return `- id:${f.id} | ${f.name} | IG:${f.glycemic_index ?? "n/a"} | ${Math.round(n.energy_kcal)}kcal/${Math.round(n.proteins_g)}g prot. pour 100g | ${f.unit_concrete_label ?? ""} | MTC nature:${f.tcm_nature ?? "n/a"} saveur:${flavors}${ownedTag}`;
     })
     .join("\n");
 
@@ -184,6 +200,10 @@ Règles impératives :
 - IG max par aliment de repas principal : ${maxIg}.
 - QUANTITÉS (quantity_g) : ajuste les grammages de chaque aliment pour que l'énergie totale de chaque repas se rapproche de sa cible (indiquée ci-dessous), en utilisant les kcal/100g fournis pour chaque aliment. Un dîner "reste" doit garder exactement les mêmes grammages que le dîner d'origine.
 - eating_order : liste les noms d'aliments du repas dans l'ordre conseillé légumes → protéines → féculents (n'inclut pas les matières grasses de cuisson comme l'huile ou le beurre).
+- MÉDECINE TRADITIONNELLE CHINOISE (MTC) — nudge secondaire, jamais prioritaire sur les règles ci-dessus : ${tcmSeasonGuidance} À règles occidentales égales (IG, allergies, pathologies déjà respectées par la liste fournie), préfère légèrement les aliments dont la nature/saveur MTC correspond à cette recommandation. N'exclus jamais un aliment pour une raison MTC seule.
+${availableFoodNames.length > 0
+    ? `- ALIMENTS DÉJÀ EN STOCK : l'utilisateur a signalé avoir déjà ${availableFoodNames.join(", ")} chez lui (marqués "DÉJÀ EN STOCK" dans la liste ci-dessous). Utilise-les en priorité, si possible dès les premiers jours de la semaine pour éviter le gaspillage, sans jamais enfreindre les règles ci-dessus (allergies, IG, saisonnalité des autres aliments).`
+    : ""}
 - Réponds UNIQUEMENT avec un JSON valide respectant strictement le schéma demandé, sans aucun texte avant ou après.`;
 
   const userPrompt = `Profil : sexe ${profile.sex}, niveau d'activité ${profile.activity_level}, IMC ${profile.bmi ?? "n/a"}.
@@ -282,6 +302,7 @@ ${foodsList}`;
       .update({
         status: "active",
         generation_params: { region_id: profile.region_id, pathologies, allergies, diet_preferences: dietPreferences, month },
+        available_foods: availableFoodIds,
       })
       .eq("id", existingPlan.id)
       .select()
@@ -298,6 +319,7 @@ ${foodsList}`;
         week_start: weekStart,
         status: "active",
         generation_params: { region_id: profile.region_id, pathologies, allergies, diet_preferences: dietPreferences, month },
+        available_foods: availableFoodIds,
       })
       .select()
       .single();
@@ -325,7 +347,7 @@ ${foodsList}`;
         meal_type: m.meal_type,
         name: m.name,
         estimated_glycemic_load: Math.round(estimatedGL * 10) / 10,
-        glycemic_level: estimatedGL <= 10 ? "low" : estimatedGL <= 19 ? "moderate" : "high",
+        glycemic_level: glycemicLevelFromLoad(estimatedGL),
         eating_order: m.eating_order ?? [],
       })
       .select()
@@ -362,65 +384,3 @@ function nutrientsOf(fn: unknown): { energy_kcal: number; proteins_g: number; ca
   };
 }
 
-// Métabolisme de base (Mifflin-St Jeor) × facteur d'activité (Livrable 1 US-011/US-012),
-// puis ajustement selon l'IMC (US-011) et répartition indicative par repas.
-function calculateCalorieTargets(profile: {
-  sex: string;
-  birth_date: string;
-  height_cm: number;
-  weight_kg: number;
-  activity_level: string;
-  bmi: number | null;
-}) {
-  const age = ageFromBirthDate(profile.birth_date);
-  const bmrMale = 10 * profile.weight_kg + 6.25 * profile.height_cm - 5 * age + 5;
-  const bmrFemale = 10 * profile.weight_kg + 6.25 * profile.height_cm - 5 * age - 161;
-  const bmr = profile.sex === "male" ? bmrMale : profile.sex === "female" ? bmrFemale : (bmrMale + bmrFemale) / 2;
-
-  const activityMultipliers: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, very_active: 1.725 };
-  const tdee = bmr * (activityMultipliers[profile.activity_level] ?? 1.375);
-
-  let adjustmentFactor = 1;
-  if (profile.bmi !== null) {
-    if (profile.bmi < 18.5) adjustmentFactor = 1.1;
-    else if (profile.bmi >= 30) adjustmentFactor = 0.8;
-    else if (profile.bmi >= 25) adjustmentFactor = 0.9;
-  }
-  const adjustedTdee = Math.round(tdee * adjustmentFactor);
-
-  return {
-    bmr: Math.round(bmr),
-    tdee: Math.round(tdee),
-    adjustedTdee,
-    perMeal: {
-      breakfast: Math.round(adjustedTdee * 0.25),
-      lunch: Math.round(adjustedTdee * 0.3),
-      snack: Math.round(adjustedTdee * 0.1),
-      dinner: Math.round(adjustedTdee * 0.35),
-    },
-  };
-}
-
-function ageFromBirthDate(birthDate: string): number {
-  const birth = new Date(birthDate + "T00:00:00Z");
-  const now = new Date();
-  let age = now.getUTCFullYear() - birth.getUTCFullYear();
-  const hasHadBirthdayThisYear =
-    now.getUTCMonth() > birth.getUTCMonth() || (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() >= birth.getUTCDate());
-  if (!hasHadBirthdayThisYear) age--;
-  return age;
-}
-
-function nextSaturday(): string {
-  const now = new Date();
-  const day = now.getUTCDay(); // 0=dimanche ... 6=samedi
-  const diff = ((6 - day + 7) % 7) || 7;
-  now.setUTCDate(now.getUTCDate() + diff);
-  return now.toISOString().slice(0, 10);
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}

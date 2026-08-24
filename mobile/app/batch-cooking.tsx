@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
@@ -181,19 +181,65 @@ export default function BatchCookingScreen() {
 }
 
 function TaskRow({ task, onToggle }: { task: Task; onToggle: () => void }) {
+  const [remainingSec, setRemainingSec] = useState<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  function startTimer() {
+    if (!task.estimated_duration_min) return;
+    setRemainingSec(task.estimated_duration_min * 60);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      setRemainingSec((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          Alert.alert('Basile vous prévient 🦡', `Minuteur terminé : ${task.description}`);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setRemainingSec(null);
+  }
+
   return (
-    <Pressable style={styles.taskRow} onPress={onToggle}>
-      <View style={[styles.checkbox, task.is_completed && styles.checkboxChecked]}>
-        {task.is_completed ? <Text style={styles.checkmark}>✓</Text> : null}
-      </View>
-      <View style={styles.taskTextWrap}>
-        <Text style={[styles.taskText, task.is_completed && styles.taskTextChecked]}>
-          {CATEGORY_ICONS[task.task_category] ?? ''} {task.description}
-        </Text>
-        {task.estimated_duration_min ? <Text style={styles.taskDuration}>{task.estimated_duration_min} min</Text> : null}
-      </View>
-    </Pressable>
+    <View style={styles.taskRow}>
+      <Pressable style={styles.taskRowTouchable} onPress={onToggle}>
+        <View style={[styles.checkbox, task.is_completed && styles.checkboxChecked]}>
+          {task.is_completed ? <Text style={styles.checkmark}>✓</Text> : null}
+        </View>
+        <View style={styles.taskTextWrap}>
+          <Text style={[styles.taskText, task.is_completed && styles.taskTextChecked]}>
+            {CATEGORY_ICONS[task.task_category] ?? ''} {task.description}
+          </Text>
+          {task.estimated_duration_min ? (
+            <Text style={styles.taskDuration}>{remainingSec !== null ? formatCountdown(remainingSec) : `${task.estimated_duration_min} min`}</Text>
+          ) : null}
+        </View>
+      </Pressable>
+      {task.estimated_duration_min ? (
+        <Pressable style={styles.timerButton} onPress={remainingSec !== null ? stopTimer : startTimer} hitSlop={10}>
+          <Text style={styles.timerButtonText}>{remainingSec !== null ? '⏹' : '▶'}</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
+}
+
+function formatCountdown(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function formatWeekday(dateStr: string): string {
@@ -225,7 +271,18 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   sectionMeta: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
-  taskRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
+  taskRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  taskRowTouchable: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8, flex: 1 },
+  timerButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  timerButtonText: { fontSize: 13, color: colors.primary },
   checkbox: {
     width: 22,
     height: 22,

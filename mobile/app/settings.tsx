@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+
+const DELETE_CONFIRMATION_WORD = 'SUPPRIMER';
 import { Chip } from '@/components/onboarding/Chip';
 import { SEX_OPTIONS, ACTIVITY_LEVELS, PATHOLOGIES, ALLERGIES, DIET_PREFERENCES } from '@/constants/onboardingOptions';
 
@@ -17,7 +19,10 @@ const ROLLOVER_OPTIONS = [
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +145,20 @@ export default function SettingsScreen() {
     setSaved(true);
   }
 
+  async function handleDeleteAccount() {
+    if (!session || deleteConfirmText !== DELETE_CONFIRMATION_WORD) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+    if (error) {
+      setDeleting(false);
+      setDeleteError('Erreur lors de la suppression. Réessayez ou contactez le support.');
+      return;
+    }
+    await signOut();
+    router.replace('/');
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
@@ -251,6 +270,27 @@ export default function SettingsScreen() {
         <Pressable style={[styles.saveButton, !canSave && styles.saveButtonDisabled]} onPress={handleSave} disabled={!canSave || saving}>
           {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveButtonText}>Enregistrer</Text>}
         </Pressable>
+
+        <Text style={styles.dangerTitle}>Zone dangereuse</Text>
+        <Text style={styles.label}>
+          Supprimer définitivement votre compte et toutes vos données (planning, historique, préférences). Cette action est irréversible.
+        </Text>
+        <Text style={styles.label}>Tapez « {DELETE_CONFIRMATION_WORD} » pour confirmer</Text>
+        <TextInput
+          style={styles.input}
+          value={deleteConfirmText}
+          onChangeText={setDeleteConfirmText}
+          autoCapitalize="characters"
+          placeholder={DELETE_CONFIRMATION_WORD}
+        />
+        {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
+        <Pressable
+          style={[styles.deleteButton, deleteConfirmText !== DELETE_CONFIRMATION_WORD && styles.saveButtonDisabled]}
+          onPress={handleDeleteAccount}
+          disabled={deleteConfirmText !== DELETE_CONFIRMATION_WORD || deleting}
+        >
+          {deleting ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveButtonText}>Supprimer mon compte</Text>}
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -294,4 +334,6 @@ const styles = StyleSheet.create({
   saveButton: { backgroundColor: colors.primary, borderRadius: radii.pill, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
   saveButtonDisabled: { opacity: 0.5 },
   saveButtonText: { color: colors.white, fontFamily: fonts.bodyMedium, fontSize: 16 },
+  dangerTitle: { fontFamily: fonts.heading, fontSize: 18, color: colors.primary, marginTop: 40, marginBottom: 8 },
+  deleteButton: { backgroundColor: colors.primary, borderRadius: radii.pill, paddingVertical: 16, alignItems: 'center', marginTop: 16, marginBottom: 20 },
 });

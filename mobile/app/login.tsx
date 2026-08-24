@@ -55,6 +55,10 @@ export default function LoginScreen() {
         {loading ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Se connecter</Text>}
       </Pressable>
 
+      <Link href="/forgot-password" style={styles.forgotLink}>
+        <Text style={styles.forgotLinkText}>Mot de passe oublié ?</Text>
+      </Link>
+
       <View style={styles.socialNote}>
         <Text style={styles.socialNoteText}>
           Connexion Apple / Google / Microsoft — à brancher lors du Sprint 1 (cf. plan de développement)
@@ -110,6 +114,15 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontFamily: fonts.bodyMedium,
     fontSize: 16,
+  },
+  forgotLink: {
+    marginTop: 16,
+    alignSelf: 'center',
+  },
+  forgotLinkText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textMuted,
   },
   socialNote: {
     marginTop: 20,

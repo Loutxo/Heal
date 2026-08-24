@@ -7,7 +7,12 @@ import { View, ActivityIndicator } from 'react-native';
 import { colors, fonts } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 
+// Accessibles sans session, ET redirigent vers /home si déjà connecté (écrans d'entrée).
 const PUBLIC_ROUTES = ['login', 'signup', 'index'];
+// Accessibles sans session mais ne redirigent JAMAIS vers /home même si une session existe —
+// reset-password en particulier crée une session via le lien de récupération avant que
+// l'utilisateur ait pu saisir son nouveau mot de passe, une redirection y serait un vrai bug.
+const ALWAYS_ACCESSIBLE_ROUTES = ['forgot-password', 'reset-password'];
 
 function RootNavigator() {
   const { session, initializing, onboardingCompleted } = useAuth();
@@ -20,11 +25,13 @@ function RootNavigator() {
 
     const currentRoute = segments[0] ?? 'index';
     const onPublicRoute = PUBLIC_ROUTES.includes(currentRoute);
+    const onAlwaysAccessibleRoute = ALWAYS_ACCESSIBLE_ROUTES.includes(currentRoute);
 
-    if (!session && !onPublicRoute) {
+    if (!session && !onPublicRoute && !onAlwaysAccessibleRoute) {
       router.replace('/');
       return;
     }
+    if (onAlwaysAccessibleRoute) return;
     if (session && onboardingCompleted === false && currentRoute !== 'onboarding') {
       router.replace('/onboarding');
       return;
@@ -57,6 +64,8 @@ function RootNavigator() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
+      <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+      <Stack.Screen name="reset-password" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="home" options={{ headerShown: false }} />
       <Stack.Screen name="planning" options={{ title: 'Votre semaine' }} />
@@ -65,6 +74,8 @@ function RootNavigator() {
       <Stack.Screen name="batch-cooking" options={{ title: 'Batch cooking' }} />
       <Stack.Screen name="calendar" options={{ title: 'Calendrier' }} />
       <Stack.Screen name="settings" options={{ title: 'Mon profil' }} />
+      <Stack.Screen name="seasonal-foods" options={{ title: 'Calendrier de saison' }} />
+      <Stack.Screen name="available-produce" options={{ title: 'Ce que vous avez déjà' }} />
     </Stack>
   );
 }

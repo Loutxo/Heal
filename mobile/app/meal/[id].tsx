@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
@@ -49,10 +49,26 @@ export default function MealDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meal, setMeal] = useState<MealDetail | null>(null);
+  const [swapping, setSwapping] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
 
   useEffect(() => {
     load();
   }, [id]);
+
+  async function handleSwap() {
+    if (!id || swapping) return;
+    setSwapping(true);
+    setSwapError(null);
+    const { data, error: swapErr } = await supabase.functions.invoke('swap-meal', { body: { meal_id: id } });
+    if (swapErr || data?.error) {
+      setSwapError(data?.error?.message ?? swapErr?.message ?? 'Erreur lors du remplacement.');
+      setSwapping(false);
+      return;
+    }
+    await load();
+    setSwapping(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -147,6 +163,11 @@ export default function MealDetailScreen() {
           <NutritionCell label="Lipides" value={`${Math.round(totals.fat)} g`} />
           <NutritionCell label="Fibres" value={`${Math.round(totals.fiber)} g`} />
         </View>
+
+        {swapError ? <Text style={styles.errorText}>{swapError}</Text> : null}
+        <Pressable style={[styles.swapButton, swapping && styles.swapButtonDisabled]} onPress={handleSwap} disabled={swapping}>
+          {swapping ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.swapButtonText}>🔄 Remplacer ce repas</Text>}
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -205,4 +226,13 @@ const styles = StyleSheet.create({
   nutritionValue: { fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.text },
   nutritionLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted, marginTop: 2 },
   errorText: { fontFamily: fonts.body, fontSize: 15, color: colors.text, textAlign: 'center' },
+  swapButton: {
+    marginTop: 28,
+    borderRadius: radii.pill,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
+  },
+  swapButtonDisabled: { opacity: 0.6 },
+  swapButtonText: { fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.primary },
 });
