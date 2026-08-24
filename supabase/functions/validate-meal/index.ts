@@ -29,7 +29,12 @@ Deno.serve(async (req) => {
   if (userError || !userData.user) return json({ error: { code: "UNAUTHENTICATED", message: "Session invalide" } }, 401);
   const userId = userData.user.id;
 
-  let body: { meal_id?: string; method?: "one_click" | "manual"; foods?: Array<{ food_id: number; quantity_g: number }> } = {};
+  let body: {
+    meal_id?: string;
+    method?: "one_click" | "manual";
+    foods?: Array<{ food_id: number; quantity_g: number }>;
+    photo_path?: string;
+  } = {};
   try {
     body = await req.json();
   } catch {
@@ -181,6 +186,7 @@ Deno.serve(async (req) => {
       meal_id: meal.id,
       validation_method: method,
       detected_foods: method === "manual" ? body.foods : null,
+      photo_url: body.photo_path ?? null,
       nutritional_score: nutritionalScore,
       glycemic_load_actual: Math.round(glycemicLoadActual * 10) / 10,
       points_earned: points,
@@ -354,9 +360,11 @@ async function checkAndAwardBadges(supabase: any, userId: string, currentStreak:
         await supabase
           .from("user_points")
           .upsert({ user_id: userId, total_points: (pr?.total_points ?? 0) + badge.points_reward }, { onConflict: "user_id" });
+        // le CHECK constraint sur points_history.source exige exactement 'badge_unlock'
+        // (pas 'badge') — deuxième cause du même bug, trouvée après le fix du type reference_id.
         const { error: historyError } = await supabase
           .from("points_history")
-          .insert({ user_id: userId, points: badge.points_reward, source: "badge", reference_id: newUserBadge.id });
+          .insert({ user_id: userId, points: badge.points_reward, source: "badge_unlock", reference_id: newUserBadge.id });
         if (historyError) console.error("BADGE_POINTS_HISTORY_ERROR", historyError.message);
       }
       newlyUnlocked.push(badge);

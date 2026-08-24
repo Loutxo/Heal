@@ -5,17 +5,23 @@ import { Stack, useRouter } from 'expo-router';
 import { colors, fonts, radii } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { Chip } from '@/components/onboarding/Chip';
+import { useAuth } from '@/context/AuthContext';
+import { pickAndAnalyzePhoto } from '@/lib/photoAnalysis';
 
 type Food = { id: number; name: string; category_id: number };
 
 export default function AvailableProduceScreen() {
   const router = useRouter();
+  const { session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [foods, setFoods] = useState<Food[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [search, setSearch] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
+  const [photoUnmatched, setPhotoUnmatched] = useState<string[]>([]);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   useEffect(() => {
     load();
@@ -42,6 +48,23 @@ export default function AvailableProduceScreen() {
 
   function toggle(id: number) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  }
+
+  async function handlePhoto(source: 'camera' | 'library') {
+    if (!session) return;
+    setPhotoError(null);
+    setPhotoUnmatched([]);
+    setAnalyzingPhoto(true);
+    try {
+      const result = await pickAndAnalyzePhoto(session.user.id, 'fridge', source);
+      if (!result) return; // annulé par l'utilisateur
+      setSelected((prev) => Array.from(new Set([...prev, ...result.matched.map((m) => m.food_id)])));
+      setPhotoUnmatched(result.unmatched);
+    } catch (e: any) {
+      setPhotoError(e?.message ?? 'Erreur lors de la reconnaissance photo.');
+    } finally {
+      setAnalyzingPhoto(false);
+    }
   }
 
   async function handleGenerate() {
@@ -77,6 +100,24 @@ export default function AvailableProduceScreen() {
           value={search}
           onChangeText={setSearch}
         />
+        <View style={styles.photoRow}>
+          <Pressable style={styles.photoButton} onPress={() => handlePhoto('camera')} disabled={analyzingPhoto}>
+            <Text style={styles.photoButtonText}>📸 Photo du frigo</Text>
+          </Pressable>
+          <Pressable style={styles.photoButton} onPress={() => handlePhoto('library')} disabled={analyzingPhoto}>
+            <Text style={styles.photoButtonText}>🖼️ Depuis la galerie</Text>
+          </Pressable>
+        </View>
+        {analyzingPhoto ? (
+          <View style={styles.photoAnalyzing}>
+            <ActivityIndicator color={colors.primary} size="small" />
+            <Text style={styles.photoAnalyzingText}>Basile regarde votre photo...</Text>
+          </View>
+        ) : null}
+        {photoUnmatched.length > 0 ? (
+          <Text style={styles.photoUnmatchedText}>Vu mais non répertorié : {photoUnmatched.join(', ')}</Text>
+        ) : null}
+        {photoError ? <Text style={styles.errorText}>{photoError}</Text> : null}
         {selected.length > 0 ? (
           <Text style={styles.selectedCount}>
             {selected.length} aliment{selected.length > 1 ? 's' : ''} sélectionné{selected.length > 1 ? 's' : ''}
@@ -134,6 +175,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   selectedCount: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.primary, marginTop: 10 },
+  photoRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  photoButton: { flex: 1, backgroundColor: colors.backgroundSecondary, borderRadius: radii.pill, paddingVertical: 12, alignItems: 'center' },
+  photoButtonText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.text },
+  photoAnalyzing: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  photoAnalyzingText: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
+  photoUnmatchedText: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted, marginTop: 8, fontStyle: 'italic' },
   scrollContent: { paddingHorizontal: 24, paddingBottom: 20 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   emptyText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted, marginTop: 20, textAlign: 'center' },

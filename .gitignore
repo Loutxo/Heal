@@ -28,6 +28,9 @@ supabase/.branches/
 
 # OS / éditeurs
 .DS_Store
+
+# Outillage Claude Code local
+.claude/
 Thumbs.db
 *.log
 npm-debug.log*

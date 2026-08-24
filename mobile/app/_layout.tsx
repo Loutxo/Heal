@@ -79,6 +79,9 @@ function RootNavigator() {
       <Stack.Screen name="badges" options={{ title: 'Mes badges' }} />
       <Stack.Screen name="points-history" options={{ title: 'Historique des points' }} />
       <Stack.Screen name="validate-manual" options={{ title: 'Valider un repas' }} />
+      <Stack.Screen name="validate-photo" options={{ title: 'Valider par photo' }} />
+      <Stack.Screen name="weekly-report" options={{ title: 'Rapport hebdomadaire' }} />
+      <Stack.Screen name="report-history" options={{ title: 'Historique des rapports' }} />
     </Stack>
   );
 }

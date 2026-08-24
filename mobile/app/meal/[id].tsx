@@ -248,6 +248,9 @@ export default function MealDetailScreen() {
             <Pressable style={styles.manualValidateLink} onPress={() => router.push(`/validate-manual?meal_id=${id}`)}>
               <Text style={styles.manualValidateLinkText}>J'ai mangé autre chose</Text>
             </Pressable>
+            <Pressable style={styles.manualValidateLink} onPress={() => router.push(`/validate-photo?meal_id=${id}`)}>
+              <Text style={styles.manualValidateLinkText}>📷 Valider avec une photo</Text>
+            </Pressable>
           </>
         )}
 

@@ -76,6 +76,10 @@ export default function HomeScreen() {
           <Text style={styles.secondaryButtonText}>🏅 Mes badges</Text>
         </Pressable>
 
+        <Pressable style={styles.secondaryButton} onPress={() => router.push('/weekly-report')}>
+          <Text style={styles.secondaryButtonText}>📊 Rapport hebdomadaire</Text>
+        </Pressable>
+
         <Pressable style={styles.secondaryButton} onPress={() => router.push('/settings')}>
           <Text style={styles.secondaryButtonText}>⚙️ Mon profil</Text>
         </Pressable>

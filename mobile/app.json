@@ -31,7 +31,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Heal utilise vos photos pour reconnaître les aliments d'un repas ou de votre frigo.",
+          "cameraPermission": "Heal utilise l'appareil photo pour reconnaître les aliments d'un repas ou de votre frigo."
+        }
+      ]
     ]
   }
 }
